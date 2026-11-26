@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}试算结果 · Kubernetes 故障恢复演练台{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Recovery Result</p>
+    <h1>节点 <code>{{ result.failedNode }}</code> 故障试算结果</h1>
+    <p class="lead">{{ result.message }}</p>
+  </div>
+  <div class="button-row">
+    <form action="/workbench" method="post">
+      <input type="hidden" name="snapshot" value='{{ snapshot | tojson | e }}'>
+      <button class="button" type="submit">重新选择节点</button>
+    </form>
+    <a class="button" href="/">上传新快照</a>
+  </div>
+</section>
+
+{% if result.feasible %}
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-value">{{ result.sourceOnlineCount }}</span>
+      <span class="stat-label">需迁移在线 Pod</span>
+    </div>
+    <div class="stat-card stat-success">
+      <span class="stat-value">{{ result.placements|length }}</span>
+      <span class="stat-label">已给出落点</span>
+    </div>
+    <div class="stat-card stat-warn">
+      <span class="stat-value">{{ result.minimumStoppedPods }}</span>
+      <span class="stat-label">最少停用 Pod</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ result.nodeReports|length }}</span>
+      <span class="stat-label">参与试算健康节点</span>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="card-header"><h2>全部迁移落点</h2></div>
+    {% if result.placements %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>迁移 Pod</th>
+            <th>应用</th>
+            <th class="num">内存请求 MiB</th>
+            <th>卷可用区要求</th>
+            <th>落点节点</th>
+            <th>落点可用区</th>
+            <th>约束校验</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in result.placements %}
+          <tr>
+            <td><code>{{ item.pod }}</code></td>
+            <td>{{ item.app }}</td>
+            <td class="num">{{ item.memoryRequestMiB }}</td>
+            <td>{{ item.volumeZone or '无卷要求' }}</td>
+            <td><strong>{{ item.node }}</strong></td>
+            <td>{{ item.zone or '未设置' }}</td>
+            <td><span class="tag tag-success">内存 / 可用区 / 反亲和通过</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty-state">故障节点上没有在线 Pod 需要迁移。</div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>需停用的可中断批作业 Pod</h2>
+      <span class="tag tag-warn">最少数量：{{ result.stops|length }}</span>
+    </div>
+    {% if result.stops %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>停用 Pod</th>
+            <th>所在节点</th>
+            <th>应用</th>
+            <th class="num">释放内存 MiB</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in result.stops %}
+          <tr>
+            <td><code>{{ item.pod }}</code></td>
+            <td>{{ item.node }}</td>
+            <td>{{ item.app }}</td>
+            <td class="num">{{ item.memoryRequestMiB }}</td>
+            <td>{{ item.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty-state success-text">无需停用任何 Pod，现有空闲内存和反亲和约束即可容纳全部迁移副本。</div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card-header"><h2>落点节点容量复核</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>节点</th>
+            <th>可用区</th>
+            <th class="num">可分配 MiB</th>
+            <th class="num">原占用 MiB</th>
+            <th class="num">停用释放 MiB</th>
+            <th class="num">迁入申请 MiB</th>
+            <th class="num">最终占用 MiB</th>
+            <th class="num">最终可用 MiB</th>
+            <th class="num">使用率</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for report in result.nodeReports %}
+          <tr>
+            <td><strong>{{ report.node }}</strong></td>
+            <td>{{ report.zone or '未设置' }}</td>
+            <td class="num">{{ report.allocatableMemoryMiB }}</td>
+            <td class="num">{{ report.beforeUsedMiB }}</td>
+            <td class="num text-warn">-{{ report.stoppedMemoryMiB }}</td>
+            <td class="num text-success">+{{ report.placedMemoryMiB }}</td>
+            <td class="num"><strong>{{ report.afterUsedMiB }}</strong></td>
+            <td class="num">{{ report.availableAfterMiB }}</td>
+            <td class="num">{{ report.utilizationPercent if report.utilizationPercent is not none else '—' }}%</td>
+          </tr>
+          {% if report.placedPods or report.stoppedPods or report.retainedPods %}
+          <tr class="detail-row">
+            <td colspan="9">
+              {% if report.placedPods %}<div>迁入：{% for name in report.placedPods %}<code>{{ name }}</code>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
+              {% if report.stoppedPods %}<div>停用：{% for name in report.stoppedPods %}<code>{{ name }}</code>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
+              {% if report.retainedPods %}<div>原地保留：{% for name in report.retainedPods %}<code>{{ name }}</code>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% else %}
+  <div class="alert alert-error" role="alert">
+    <h2>无法恢复</h2>
+    <p>{{ result.message }}</p>
+    {% if result.blockers %}
+      <ul class="blocker-list">
+        {% for blocker in result.blockers %}<li>{{ blocker }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+
+  <section class="card">
+    <h2>接下来可以检查</h2>
+    <ul class="check-list">
+      <li>是否有其他同应用在线副本占用了符合卷可用区的节点；</li>
+      <li>可中断批作业的内存总量是否足以补足内存缺口；</li>
+      <li>带卷 Pod 的 <code>volumeZone</code> 是否存在对应 <code>zone</code> 的健康节点；</li>
+      <li>是否需要接入新的健康节点或人工扩容。</li>
+    </ul>
+  </section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Disaster Recovery Drill</p>
+    <h1>选择故障节点，试算在线 Pod 的安全落点</h1>
+    <p class="lead">
+      上传最多 8 台节点的 JSON 快照。工具会检查内存、卷可用区和同应用反亲和约束，
+      只允许停用可中断的批作业 Pod，并给出停用数最少的完整方案。
+    </p>
+  </div>
+  <div class="hero-badge">
+    <strong>≤ 8</strong>
+    <span>节点 / 故障节点在线 Pod</span>
+  </div>
+</section>
+
+{% if error %}
+<div class="alert alert-error" role="alert">
+  <strong>无法载入快照：</strong>{{ error }}
+</div>
+{% endif %}
+
+<section class="grid two-columns">
+  <div class="card">
+    <div class="card-header">
+      <h2>1. 上传或粘贴快照</h2>
+      <div class="button-row">
+        <button class="button button-ghost" id="load-example" type="button">填入可恢复示例</button>
+        <button class="button button-ghost" id="load-unrecoverable" type="button">填入无法恢复示例</button>
+        <a class="button button-ghost" href="/examples/snapshot.json" download>下载模板</a>
+      </div>
+    </div>
+
+    <form action="/snapshot" method="post" enctype="multipart/form-data" class="upload-form">
+      <label class="file-drop" for="snapshot_file">
+        <input id="snapshot_file" name="snapshot_file" type="file" accept=".json,application/json">
+        <span class="file-drop-title">点击选择 JSON 文件</span>
+        <span class="file-drop-hint">也可以直接把内容粘贴到下方文本框</span>
+      </label>
+
+      <label class="field-label" for="snapshot_text">JSON 内容</label>
+      <textarea
+        id="snapshot_text"
+        name="snapshot_text"
+        class="code-editor"
+        spellcheck="false"
+        placeholder='{"nodes":[{"name":"node-a","zone":"az-a","allocatableMemoryMiB":12288}],"pods":[...]}'
+      ></textarea>
+
+      <div class="form-actions">
+        <button class="button button-primary" type="submit">校验并选择故障节点</button>
+      </div>
+    </form>
+  </div>
+
+  <aside class="card schema-card">
+    <h2>快照字段</h2>
+    <p class="muted">数字内存字段默认使用 MiB；也支持 <code>512Mi</code>、<code>2Gi</code> 等 Kubernetes 风格字符串。</p>
+
+    <h3>节点 nodes[]</h3>
+    <ul class="field-list">
+      <li><code>name</code>：节点名称</li>
+      <li><code>zone</code>：节点可用区</li>
+      <li><code>allocatableMemoryMiB</code>：可分配内存</li>
+    </ul>
+
+    <h3>Pod pods[]</h3>
+    <ul class="field-list">
+      <li><code>name</code> / <code>node</code>：名称与所在节点</li>
+      <li><code>app</code>：应用标识，相同 app 视为副本</li>
+      <li><code>type</code>：<code>online</code> 或 <code>batch</code></li>
+      <li><code>memoryRequestMiB</code>：内存请求</li>
+      <li><code>volumeZone</code>：卷可用区；无卷可留空</li>
+      <li><code>interruptible</code>：是否可中断</li>
+    </ul>
+
+    <div class="notice">
+      只有 <code>type: "batch"</code> 且 <code>interruptible: true</code> 的 Pod 会被选作停用对象。
+    </div>
+  </aside>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Kubernetes 故障恢复演练台{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark">K8s</span>
+        <span>
+          <strong>故障恢复演练台</strong>
+          <small>Failure Recovery Planner</small>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="/">新建试算</a>
+        <a href="/examples/snapshot.json" target="_blank" rel="noopener">JSON 示例</a>
+        <a href="/healthz" target="_blank" rel="noopener">健康检查</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container page">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      本地试算器会枚举落点组合，并以停用 Pod 数量最少为目标；不会连接真实集群或执行停用操作。
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

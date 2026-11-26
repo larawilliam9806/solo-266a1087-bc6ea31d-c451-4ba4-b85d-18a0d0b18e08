@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "name": "failed-node",
+      "zone": "az-a",
+      "allocatableMemoryMiB": 8192
+    },
+    {
+      "name": "worker-a",
+      "zone": "az-a",
+      "allocatableMemoryMiB": 4096
+    },
+    {
+      "name": "worker-b",
+      "zone": "az-b",
+      "allocatableMemoryMiB": 4096
+    }
+  ],
+  "pods": [
+    {
+      "name": "locked-db-0",
+      "node": "failed-node",
+      "app": "locked-db",
+      "type": "online",
+      "memoryRequestMiB": 2048,
+      "volumeZone": "az-c",
+      "interruptible": false
+    },
+    {
+      "name": "api-0",
+      "node": "failed-node",
+      "app": "api",
+      "type": "online",
+      "memoryRequestMiB": 1024,
+      "volumeZone": null,
+      "interruptible": false
+    },
+    {
+      "name": "api-1",
+      "node": "worker-a",
+      "app": "api",
+      "type": "online",
+      "memoryRequestMiB": 1024,
+      "volumeZone": null,
+      "interruptible": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+services:
+  recovery-lab:
+    build:
+      context: .
+    image: k8s-recovery-lab:latest
+    container_name: k8s-recovery-lab
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s

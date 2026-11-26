@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}选择故障节点 · Kubernetes 故障恢复演练台{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Validated Snapshot</p>
+    <h1>快照校验通过</h1>
+    <p class="lead">共 {{ snapshot.nodes|length }} 台节点、{{ snapshot.pods|length }} 个 Pod。请选择一台故障节点并开始试算。</p>
+  </div>
+  <a class="button" href="/">重新上传</a>
+</section>
+
+{% if error %}
+<div class="alert alert-error" role="alert"><strong>试算失败：</strong>{{ error }}</div>
+{% endif %}
+
+<form action="/plan" method="post" class="card recovery-form">
+  <input type="hidden" name="snapshot" value='{{ snapshot_json }}'>
+  <div class="card-header">
+    <h2>2. 选择故障节点</h2>
+    <button class="button button-primary" type="submit">开始最少停用试算</button>
+  </div>
+
+  <div class="node-grid">
+    {% for node in snapshot.nodes %}
+      {% set node_pods = snapshot.pods | selectattr('node', 'equalto', node.name) | list %}
+      {% set online_pods = node_pods | selectattr('workloadType', 'equalto', 'online') | list %}
+      {% set batch_pods = node_pods | selectattr('workloadType', 'equalto', 'batch') | list %}
+      <label class="node-choice">
+        <input type="radio" name="failed_node" value="{{ node.name }}" required
+          {% if request.form.get('failed_node') == node.name %}checked{% endif %}>
+        <span class="node-choice-body">
+          <strong>{{ node.name }}</strong>
+          <span class="node-meta">可用区：{{ node.zone or '未设置' }}</span>
+          <span class="node-meta">可分配：{{ node.allocatableMemoryMiB }} MiB</span>
+          <span class="node-meta">Pod：{{ node_pods|length }}（在线 {{ online_pods|length }} / 批作业 {{ batch_pods|length }}）</span>
+          {% if online_pods|length > 8 %}
+            <span class="tag tag-danger">在线 Pod 超过 8 个上限</span>
+          {% elif online_pods|length > 0 %}
+            <span class="tag tag-info">将迁移 {{ online_pods|length }} 个在线 Pod</span>
+          {% else %}
+            <span class="tag">无在线 Pod</span>
+          {% endif %}
+        </span>
+      </label>
+    {% endfor %}
+  </div>
+</form>
+
+<section class="card">
+  <div class="card-header">
+    <h2>快照明细</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Pod</th>
+          <th>位置</th>
+          <th>应用</th>
+          <th>类型</th>
+          <th class="num">内存请求 MiB</th>
+          <th>卷可用区</th>
+          <th>可中断</th>
+          <th>可停用候选</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pod in snapshot.pods %}
+        <tr>
+          <td><code>{{ pod.name }}</code></td>
+          <td>{{ pod.node }}</td>
+          <td>{{ pod.app }}</td>
+          <td>
+            {% if pod.workloadType == 'batch' %}
+              <span class="tag tag-warn">批作业 · {{ pod.typeLabel }}</span>
+            {% else %}
+              <span class="tag tag-info">在线 · {{ pod.typeLabel }}</span>
+            {% endif %}
+          </td>
+          <td class="num">{{ pod.memoryRequestMiB }}</td>
+          <td>{{ pod.volumeZone or '—' }}</td>
+          <td>{{ '是' if pod.interruptible else '否' }}</td>
+          <td>
+            {% if pod.eligibleToStop %}
+              <span class="tag tag-success">是</span>
+            {% else %}
+              <span class="tag">否</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<details class="card json-editor-details">
+  <summary><h2>编辑并重新校验 JSON</h2></summary>
+  <form action="/snapshot" method="post">
+    <textarea name="snapshot_text" class="code-editor large" spellcheck="false">{{ pretty_json }}</textarea>
+    <div class="form-actions">
+      <button class="button button-primary" type="submit">重新校验快照</button>
+    </div>
+  </form>
+</details>
+{% endblock %}

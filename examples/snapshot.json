@@ -1,0 +1,116 @@
+{
+  "nodes": [
+    {
+      "name": "k8s-node-1",
+      "zone": "az-a",
+      "allocatableMemoryMiB": 16384
+    },
+    {
+      "name": "k8s-node-2",
+      "zone": "az-a",
+      "allocatableMemoryMiB": 12288
+    },
+    {
+      "name": "k8s-node-3",
+      "zone": "az-b",
+      "allocatableMemoryMiB": 8192
+    },
+    {
+      "name": "k8s-node-4",
+      "zone": "az-a",
+      "allocatableMemoryMiB": 6144
+    }
+  ],
+  "pods": [
+    {
+      "name": "order-7",
+      "node": "k8s-node-1",
+      "app": "order",
+      "type": "online",
+      "memoryRequestMiB": 3072,
+      "volumeZone": "az-a",
+      "interruptible": false
+    },
+    {
+      "name": "payment-7",
+      "node": "k8s-node-1",
+      "app": "payment",
+      "type": "online",
+      "memoryRequestMiB": 4096,
+      "volumeZone": "az-b",
+      "interruptible": false
+    },
+    {
+      "name": "search-7",
+      "node": "k8s-node-1",
+      "app": "search",
+      "type": "online",
+      "memoryRequestMiB": 2048,
+      "volumeZone": null,
+      "interruptible": false
+    },
+    {
+      "name": "gateway-7",
+      "node": "k8s-node-1",
+      "app": "gateway",
+      "type": "online",
+      "memoryRequestMiB": 1024,
+      "volumeZone": null,
+      "interruptible": false
+    },
+    {
+      "name": "order-8",
+      "node": "k8s-node-2",
+      "app": "order",
+      "type": "online",
+      "memoryRequestMiB": 4096,
+      "volumeZone": "az-a",
+      "interruptible": false
+    },
+    {
+      "name": "gateway-8",
+      "node": "k8s-node-2",
+      "app": "gateway",
+      "type": "online",
+      "memoryRequestMiB": 1024,
+      "volumeZone": null,
+      "interruptible": false
+    },
+    {
+      "name": "batch-reindex",
+      "node": "k8s-node-2",
+      "app": "reindex",
+      "type": "batch",
+      "memoryRequestMiB": 6144,
+      "volumeZone": null,
+      "interruptible": true
+    },
+    {
+      "name": "batch-report",
+      "node": "k8s-node-2",
+      "app": "report",
+      "type": "batch",
+      "memoryRequestMiB": 1024,
+      "volumeZone": null,
+      "interruptible": true
+    },
+    {
+      "name": "ledger-5",
+      "node": "k8s-node-3",
+      "app": "ledger",
+      "type": "online",
+      "memoryRequestMiB": 4096,
+      "volumeZone": null,
+      "interruptible": false
+    },
+    {
+      "name": "catalog-8",
+      "node": "k8s-node-4",
+      "app": "catalog",
+      "type": "online",
+      "memoryRequestMiB": 2048,
+      "volumeZone": "az-a",
+      "interruptible": false
+    }
+  ]
+}
