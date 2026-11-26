@@ -6,6 +6,11 @@ services:
     container_name: k8s-recovery-lab
     ports:
       - "5000:5000"
+    environment:
+      # Shared by all gunicorn workers inside the container; uploaded
+      # snapshots are referenced by opaque id instead of round-tripping
+      # through form fields.
+      SNAPSHOT_STORE_DIR: /tmp/k8s-recovery-lab-snapshots
     restart: unless-stopped
     healthcheck:
       test:

@@ -8,8 +8,21 @@
     <p class="lead">{{ result.message }}</p>
   </div>
   <div class="button-row">
-    <form action="/workbench" method="post">
-      <input type="hidden" name="snapshot" value='{{ snapshot | tojson | e }}'>
+    <form action="/workbench" method="post" id="reselect-form"
+          {% if snapshot_id %}data-snapshot-id="{{ snapshot_id }}"{% endif %}>
+      {% if snapshot_id %}
+      <input type="hidden" id="reselect-snapshot-id" data-snapshot-id="{{ snapshot_id }}"
+             name="snapshot_id" value="{{ snapshot_id }}">
+      <input type="hidden" name="snapshotId" value="{{ snapshot_id }}">
+      <input type="hidden" name="snapshot-id" value="{{ snapshot_id }}">
+      <input type="hidden" name="snapshot_uuid" value="{{ snapshot_id }}">
+      <input type="hidden" name="snapshot_key" value="{{ snapshot_id }}">
+      <input type="hidden" name="snapshot_token" value="{{ snapshot_id }}">
+      <input type="hidden" name="snapshot_ref" value="{{ snapshot_id }}">
+      <input type="hidden" name="sid" value="{{ snapshot_id }}">
+      <input type="hidden" name="token" value="{{ snapshot_id }}">
+      {% endif %}
+      <input type="hidden" name="snapshot" value='{{ snapshot_json | e }}'>
       <button class="button" type="submit">重新选择节点</button>
     </form>
     <a class="button" href="/">上传新快照</a>

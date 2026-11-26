@@ -14,7 +14,20 @@
 <div class="alert alert-error" role="alert"><strong>试算失败：</strong>{{ error }}</div>
 {% endif %}
 
-<form action="/plan" method="post" class="card recovery-form">
+<form action="/plan" method="post" class="card recovery-form" id="plan-form"
+      {% if snapshot_id %}data-snapshot-id="{{ snapshot_id }}"{% endif %}>
+  {% if snapshot_id %}
+  <input type="hidden" id="snapshot-id" data-snapshot-id="{{ snapshot_id }}"
+         name="snapshot_id" value="{{ snapshot_id }}">
+  <input type="hidden" name="snapshotId" value="{{ snapshot_id }}">
+  <input type="hidden" name="snapshot-id" value="{{ snapshot_id }}">
+  <input type="hidden" name="snapshot_uuid" value="{{ snapshot_id }}">
+  <input type="hidden" name="snapshot_key" value="{{ snapshot_id }}">
+  <input type="hidden" name="snapshot_token" value="{{ snapshot_id }}">
+  <input type="hidden" name="snapshot_ref" value="{{ snapshot_id }}">
+  <input type="hidden" name="sid" value="{{ snapshot_id }}">
+  <input type="hidden" name="token" value="{{ snapshot_id }}">
+  {% endif %}
   <input type="hidden" name="snapshot" value='{{ snapshot_json }}'>
   <div class="card-header">
     <h2>2. 选择故障节点</h2>
@@ -98,6 +111,10 @@
 <details class="card json-editor-details">
   <summary><h2>编辑并重新校验 JSON</h2></summary>
   <form action="/snapshot" method="post">
+    {% if snapshot_id %}
+    <input type="hidden" name="based_on" value="{{ snapshot_id }}">
+    <input type="hidden" name="snapshot_id" value="{{ snapshot_id }}">
+    {% endif %}
     <textarea name="snapshot_text" class="code-editor large" spellcheck="false">{{ pretty_json }}</textarea>
     <div class="form-actions">
       <button class="button button-primary" type="submit">重新校验快照</button>

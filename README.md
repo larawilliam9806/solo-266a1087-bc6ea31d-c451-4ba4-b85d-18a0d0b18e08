@@ -37,6 +37,11 @@ docker compose up --build
 docker compose down
 ```
 
+快照在校验通过后会以不可变 id 的形式存放在共享目录
+（默认 `/tmp/k8s-recovery-lab-snapshots`，可用 `SNAPSHOT_STORE_DIR` 覆盖），
+页面表单只回传该 id，因此试算与“重新选择节点”不会把整个快照再次放进请求体；
+两个 gunicorn worker 共享同一文件目录，不同标签页各自持有独立 id。
+
 ## 本地直接运行
 
 需要 Python 3.11+：
@@ -179,6 +184,8 @@ pytest -q
 │   ├── __init__.py       # Flask factory
 │   ├── memory.py         # MiB / Kubernetes memory quantity parsing
 │   ├── normalize.py      # snapshot validation and aliases
+│   ├── snapshot_store.py # cross-worker file store for accepted snapshots
+│   ├── snapshot_io.py    # exact-byte JSON rendering / edit reconciliation
 │   ├── routes.py         # HTML + JSON routes
 │   └── solver.py         # exact bitmask DP planner
 ├── examples/snapshot.json

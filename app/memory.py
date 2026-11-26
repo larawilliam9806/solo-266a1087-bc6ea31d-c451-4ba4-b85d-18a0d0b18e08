@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
 from typing import Any
 
 _MISSING = object()
@@ -40,6 +40,26 @@ class MemoryParseError(ValueError):
     """Raised when a memory quantity cannot be interpreted."""
 
 
+def _decimal_bytes_to_int(value: Decimal) -> int:
+    """Convert an exact Decimal byte count to a non-negative int.
+
+    Memory accounting is performed in integral bytes.  JSON numbers with
+    sub-MiB decimals usually originate from an exact byte count rendered as a
+    fractional MiB value and may have passed through a binary float round
+    trip, leaving an error far below one byte.  Snap such values back to the
+    nearest integer instead of truncating a value that is, for example,
+    ``B - 1e-7`` to ``B - 1``.
+    """
+
+    if value < 0:
+        raise MemoryParseError("内存值不能为负数")
+    nearest = int(value.to_integral_value(rounding=ROUND_HALF_EVEN))
+    tolerance = Decimal("0.01") + abs(value) * Decimal("1e-14")
+    if abs(value - Decimal(nearest)) <= tolerance:
+        return nearest
+    return int(value)
+
+
 def parse_memory_bytes(value: Any, *, default_unit: str = "MiB", field: str = "memory") -> int:
     """Parse a memory value into an integral number of bytes.
 
@@ -67,7 +87,12 @@ def parse_memory_bytes(value: Any, *, default_unit: str = "MiB", field: str = "m
             raise MemoryParseError(f"{field} 必须是非负数字")
         unit = default_unit.lower()
         factor = 1 if unit in {"b", "byte", "bytes"} else _UNIT_FACTORS[unit]
-        return int(Decimal(str(value)) * Decimal(factor))
+        return _decimal_bytes_to_int(Decimal(str(value)) * Decimal(factor))
+
+    if isinstance(value, Decimal):
+        unit = default_unit.lower()
+        factor = 1 if unit in {"b", "byte", "bytes"} else _UNIT_FACTORS[unit]
+        return _decimal_bytes_to_int(value * Decimal(factor))
 
     if not isinstance(value, str):
         raise MemoryParseError(f"{field} 必须是数字或 Kubernetes 风格内存字符串")
@@ -97,7 +122,7 @@ def parse_memory_bytes(value: Any, *, default_unit: str = "MiB", field: str = "m
     bytes_value = quantity * Decimal(factor)
     if bytes_value < 0:
         raise MemoryParseError(f"{field} 不能为负数")
-    return int(bytes_value)
+    return _decimal_bytes_to_int(bytes_value)
 
 
 def bytes_to_mib(value_bytes: int) -> int | float:
@@ -114,3 +139,9 @@ def format_mib(value_bytes: int) -> str:
     if abs(mib - round(mib)) < 0.0005:
         return str(int(round(mib)))
     return f"{mib:.2f}".rstrip("0").rstrip(".")
+
+
+def exact_mib_decimal(value_bytes: int) -> Decimal:
+    """Return the exact MiB value (bytes / 2**20) as a Decimal."""
+
+    return Decimal(int(value_bytes)) / Decimal(1024**2)

@@ -232,10 +232,92 @@ def _node_zone(raw: dict[str, Any]) -> str | None:
     return None
 
 
+def _coerce_exact_bytes(value: Any, field: str) -> int:
+    """Interpret an explicit byte-count field (ints are already bytes)."""
+
+    if isinstance(value, bool):
+        raise SnapshotError(f"{field} 不能是布尔值")
+    try:
+        return parse_memory_bytes(value, default_unit="B", field=field)
+    except MemoryParseError as exc:
+        raise SnapshotError(str(exc)) from exc
+
+
+def _resolve_memory_bytes(
+    raw: dict[str, Any],
+    *,
+    exact_keys: tuple[str, ...],
+    human_keys: tuple[str, ...],
+    index_label: str,
+    missing_message: str,
+) -> int:
+    """Resolve memory in exact bytes.
+
+    ``exact_keys`` carry an integral byte count produced by this application;
+    ``human_keys`` use the documented MiB-default / quantity-string syntax.
+
+    When both are present and disagree, the human-facing field is assumed to
+    contain a fresh edit and wins; callers that know a baseline can instead
+    set the ``__exactMemoryBytes__`` sentinel to force an edited byte count.
+    """
+
+    forced = raw.get("__exactMemoryBytes__")
+    if forced is not None:
+        return _coerce_exact_bytes(forced, index_label)
+
+    exact_value: Any = MISSING
+    exact_key_used: str | None = None
+    for key in exact_keys:
+        if key in raw and raw[key] is not None:
+            exact_value = raw[key]
+            exact_key_used = key
+            break
+
+    human_value = _first(raw, human_keys)
+
+    if exact_value is MISSING and human_value is MISSING:
+        raise SnapshotError(missing_message)
+
+    exact_bytes: int | None = None
+    if exact_value is not MISSING:
+        exact_bytes = _coerce_exact_bytes(exact_value, f"{index_label}.{exact_key_used}")
+
+    if human_value is MISSING:
+        assert exact_bytes is not None
+        return exact_bytes
+
+    try:
+        human_bytes = parse_memory_bytes(
+            human_value, default_unit="MiB", field=index_label
+        )
+    except MemoryParseError as exc:
+        raise SnapshotError(str(exc)) from exc
+
+    if exact_bytes is None:
+        return human_bytes
+
+    if human_bytes == exact_bytes:
+        return exact_bytes
+
+    # The canonical snapshot emits a rounded MiB *display* value next to the
+    # exact byte count.  Re-normalizing that unchanged pair must preserve the
+    # exact bytes (a few bytes are invisible in the rounded value).  Only a
+    # human value that differs from that rounded representation is treated as
+    # a fresh edit and wins over the stale exact field.
+    rounded_display_bytes = parse_memory_bytes(
+        bytes_to_mib(exact_bytes), default_unit="MiB", field=index_label
+    )
+    if human_bytes == rounded_display_bytes:
+        return exact_bytes
+
+    return human_bytes
+
+
 def _node_memory(raw: dict[str, Any], index: int) -> int:
-    value = _first(
+    return _resolve_memory_bytes(
         raw,
-        (
+        exact_keys=("allocatableBytes", "allocatable_bytes"),
+        human_keys=(
             "allocatableMemoryMiB",
             "allocatable_memory_mib",
             "allocatableMemoryMB",
@@ -250,14 +332,9 @@ def _node_memory(raw: dict[str, Any], index: int) -> int:
             "status.capacity.memory",
             "capacity.memory",
         ),
+        index_label=f"nodes[{index}].allocatableMemory",
+        missing_message=f"第 {index + 1} 台节点缺少可分配内存字段",
     )
-    value = _require(value, f"第 {index + 1} 台节点缺少可分配内存字段")
-    try:
-        # Kubernetes nested values are suffixed strings; plain schema fields
-        # ending in MiB use the default MiB.
-        return parse_memory_bytes(value, default_unit="MiB", field=f"nodes[{index}].allocatableMemory")
-    except MemoryParseError as exc:
-        raise SnapshotError(str(exc)) from exc
 
 
 def _container_memory(raw: dict[str, Any]) -> int | None:
@@ -485,18 +562,35 @@ def normalize_snapshot(payload: Any) -> dict[str, Any]:
                 "resources.requests.memory",
             ),
         )
-        if memory_value is MISSING:
+        has_exact_memory = any(
+            raw_pod.get(key) is not None
+            for key in ("memoryBytes", "memory_bytes", "__exactMemoryBytes__")
+        )
+        if memory_value is MISSING and not has_exact_memory:
             container_memory = _container_memory(raw_pod)
             if container_memory is None:
                 raise SnapshotError(f"Pod {name} 缺少内存请求 memoryRequestMiB")
             memory_bytes = container_memory
         else:
-            try:
-                memory_bytes = parse_memory_bytes(
-                    memory_value, default_unit="MiB", field=f"pods[{index}].memoryRequest"
-                )
-            except MemoryParseError as exc:
-                raise SnapshotError(str(exc)) from exc
+            memory_bytes = _resolve_memory_bytes(
+                raw_pod,
+                exact_keys=("memoryBytes", "memory_bytes"),
+                human_keys=(
+                    "memoryRequestMiB",
+                    "memory_request_mib",
+                    "memoryRequestMB",
+                    "memoryRequest",
+                    "memory_request",
+                    "requestMemoryMiB",
+                    "requestMemory",
+                    "memoryMiB",
+                    "memory",
+                    "内存请求",
+                    "resources.requests.memory",
+                ),
+                index_label=f"pods[{index}].memoryRequest",
+                missing_message=f"Pod {name} 缺少内存请求 memoryRequestMiB",
+            )
 
         volume_zones = _volume_zones(raw_pod)
         eligible_to_stop = workload_type == "batch" and interruptible
